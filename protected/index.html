@@ -1,0 +1,475 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8"/>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+    <title>WhatsApp Multiaccount Dashboard</title>
+    <link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+    <header>
+        <img src="https://foxyx.online/assets/images/foxy.png" alt="Logo" class="logo">
+        <a href="/" class="custom-link">
+            <h1>WhatsApp Bulk Multiaccount</h1>
+        </a>
+        <!-- Profile Dropdown -->
+        <div class="profile-dropdown">
+            <img src="https://cdn-icons-png.flaticon.com/512/1077/1077012.png" alt="Profile" class="profile-icon" id="profileIcon">
+            <div class="dropdown-content" id="dropdownContent">
+                <a href="#" id="changePasswordBtn">Ganti Password</a>
+                <a href="/logout" id="logoutBtn">Logout</a>
+            </div>
+        </div>
+    </header>
+
+    <main>
+        <section class="controls">
+            <button id="addBtn"><b>+ Add Account</b></button>
+            <div id="accounts"></div>
+        </section>
+        <section class="details">
+            <h2 id="accountTitle">How To Add Account</h2>
+            <div id="accountInfo">
+                <ol style="
+                width: 100%;
+                height: calc(100% - 80px); /* Mengurangi margin dan padding */
+                margin: 0;
+                padding: 20px;
+                box-sizing: border-box;
+                border: 1px solid #ddd;
+                border-radius: 8px;
+                background-color: #f9f9f9;
+                line-height: 1.6;
+                color: #555;
+                overflow-y: auto;
+            ">
+                <li style="margin-bottom: 15px;">
+                    Klik &nbsp<strong><span style="
+                        background-color: #4caf50;
+                        color: white;
+                        padding: 5px 10px;
+                        border-radius: 4px;
+                        cursor: pointer;
+                    ">
+                        + Add Account
+                    </span></strong>
+                </li>
+                <li style="margin-bottom: 15px;">Tunggu hingga QR muncul</li>
+                <li style="margin-bottom: 15px;">Scan QR dengan akun BOT</li>
+                <li style="margin-bottom: 15px;">Ganti nama untuk memudahkan identifikasi</li>
+                <li style="margin-bottom: 15px;">Chat nomor BOT dengan <code>/help</code></li>
+            </ol>
+        </section>                 
+    </main>
+
+    <!-- Modal for Change Password -->
+    <div id="changePasswordModal" class="modal">
+        <div class="modal-content">
+            <span class="close" id="closeChangePasswordModal">&times;</span>
+            <h2>Ganti Password</h2>
+            <form id="changePasswordForm">
+                <label for="currentPassword">Password Saat Ini:</label>
+                <input type="password" id="currentPassword" name="currentPassword" required maxlength="20">
+
+                <label for="newPassword">Password Baru:</label>
+                <input type="password" id="newPassword" name="newPassword" required maxlength="20">
+
+                <label for="confirmNewPassword">Konfirmasi Password Baru:</label>
+                <input type="password" id="confirmNewPassword" name="confirmNewPassword" required maxlength="20">
+
+                <button type="submit">Ganti Password</button>
+            </form>
+            <p id="changePasswordError" class="error-message"></p>
+            <p id="changePasswordSuccess" class="success-message"></p>
+        </div>
+    </div>
+
+     <!-- Modal for Add Account -->
+     <div id="addAccountModal" class="modal">
+        <div class="modal-content">
+            <span class="close" id="closeAddAccountModal">&times;</span>
+            <h2>Tambah Akun</h2>
+            <form id="addAccountForm">
+                <label for="newUsername">Username:</label>
+                <input type="text" id="newUsername" name="newUsername" required maxlength="20">
+
+                <label for="newPassword">Password:</label>
+                <input type="password" id="newPassword" name="newPassword" required maxlength="20">
+
+                <button type="submit">Tambah Akun</button>
+            </form>
+            <p id="addAccountError" class="error-message"></p>
+            <p id="addAccountSuccess" class="success-message"></p>
+        </div>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            let selectedClientId = null;
+
+            function updateAccountTitle(name) {
+                const accountTitle = document.getElementById('accountTitle');
+                accountTitle.textContent = `${name} Account`;
+            }
+
+            async function fetchClients() {
+                const res = await fetch('/list_clients');
+                return await res.json();
+            }
+
+            async function fetchAccountData(clientId) {
+                const res = await fetch('/account?clientId=' + clientId);
+                return await res.json();
+            }
+
+            async function deleteSession(clientId) {
+                if (!confirm('Apakah Anda yakin ingin menghapus sesi ini?')) return;
+
+                try {
+                    const res = await fetch('/delete-session', { // Pastikan endpoint sesuai dengan backend Anda
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ clientId })
+                    });
+
+                    const data = await res.json();
+
+                    if (data.success) {
+                        if (selectedClientId === clientId) {
+                            selectedClientId = null;
+                            document.getElementById('accountInfo').innerHTML = `<p>Select an account from the left panel</p>`;
+                        }
+                        updateAccountsList();
+                        alert('Sesi berhasil dihapus.');
+                    } else {
+                        alert('Gagal menghapus sesi: ' + data.message);
+                    }
+                } catch (error) {
+                    console.error('Error during session deletion:', error);
+                    alert('Terjadi kesalahan. Silakan coba lagi.');
+                }
+            }
+
+            async function rename(clientId) {
+                // Prompt the user to enter a new name with a clear instruction about the max length
+                const newName = prompt('Masukkan nama baru (maksimum 7 karakter):');
+
+                // Trim whitespace from the input
+                const trimmedName = newName ? newName.trim() : '';
+
+                // Check if the input is not empty
+                if (trimmedName !== '') {
+                    // Validate the length of the new name
+                    if (trimmedName.length > 7) {
+                        // Alert the user if the name exceeds 7 characters
+                        alert('Nama terlalu panjang. Maksimum 7 karakter.');
+                        return; // Exit the function early
+                    }
+
+                    try {
+                        // Send the rename request to the server
+                        const res = await fetch('/rename', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ clientId, newName: trimmedName })
+                        });
+
+                        // Parse the JSON response
+                        const data = await res.json();
+
+                        // Check if the rename was successful
+                        if (data.success) {
+                            // Update the accounts list in the UI
+                            updateAccountsList();
+
+                            // If the renamed client is currently selected, update its info
+                            if (selectedClientId === clientId) {
+                                updateAccountInfo();
+                            }
+
+                            // Optionally, notify the user of the successful rename
+                            alert('Nama berhasil diubah.');
+                        } else {
+                            // Alert the user if there was an error during renaming
+                            alert('Gagal mengubah nama: ' + data.message);
+                        }
+                    } catch (error) {
+                        // Handle any network or unexpected errors
+                        console.error('Error during rename:', error);
+                        alert('Terjadi kesalahan saat mengubah nama. Silakan coba lagi.');
+                    }
+                } else {
+                    // Optionally, notify the user if no input was provided
+                    alert('Nama baru tidak boleh kosong.');
+                }
+            }
+
+
+            async function updateAccountsList() {
+                try {
+                    const accounts = await fetchClients();
+                    const accountsDiv = document.getElementById('accounts');
+                    accountsDiv.innerHTML = '';
+                    accounts.forEach(acc => {
+                        const div = document.createElement('div');
+                        div.classList.add('account-item');
+                        if (acc.clientId === selectedClientId) {
+                            div.classList.add('active');
+                        }
+                        div.innerHTML = `
+                            <span class="acc-name">${acc.name} ${acc.ready ? '✅' : '❌'}</span>
+                            <button class="icon-btn rename-btn" data-id="${acc.clientId}" title="Rename">
+                                <img src="https://cdn-icons-png.flaticon.com/512/10977/10977199.png" alt="Rename" class="icon-img">
+                            </button>
+                            <button class="icon-btn delete-session-btn" data-id="${acc.clientId}" title="Delete Session">
+                                <img src="https://cdn-icons-png.flaticon.com/512/9790/9790368.png" alt="Delete Session" class="icon-img">
+                            </button>
+                        `;
+                        div.onclick = (e) => {
+                            if (e.target.closest('.delete-session-btn') || e.target.closest('.rename-btn')) return;
+                            selectedClientId = acc.clientId;
+                            updateAccountInfo();
+                            updateAccountTitle(acc.name); // Update the account title here
+                        };
+                        accountsDiv.appendChild(div);
+
+                        const deleteSessionBtn = div.querySelector('.delete-session-btn');
+                        deleteSessionBtn.onclick = async (e) => {
+                            e.stopPropagation();
+                            const cId = e.target.closest('button').getAttribute('data-id');
+                            await deleteSession(cId);
+                        };
+
+                        const renameBtn = div.querySelector('.rename-btn');
+                        renameBtn.onclick = async (e) => {
+                            e.stopPropagation();
+                            const cId = e.target.closest('button').getAttribute('data-id');
+                            await rename(cId);
+                        };
+                    });
+                } catch (error) {
+                    console.error('Error fetching accounts:', error);
+                }
+            }
+
+
+            async function updateAccountInfo() {
+                if (!selectedClientId) return;
+                
+                // Fetch account data from the server
+                const data = await fetchAccountData(selectedClientId);
+                const infoDiv = document.getElementById('accountInfo');
+                
+                // Handle error scenario
+                if (data.error) {
+                    infoDiv.innerHTML = `<p>${data.error}</p>`;
+                    return;
+                }
+
+                let html = '';
+                
+                // Display QR Code if available
+                if (data.qrData) {
+                    html += `<h3>Scan this QR Code:</h3><img src="${data.qrData}" class="qr">`;
+                } else {
+                    // Display connection status
+                    html += `<p class="${data.ready ? 'status-connected' : 'status-not-connected'}">Status: ${data.ready ? 'Connected' : 'Not Connected'}</p>`;
+                }
+
+                // Display Logs
+                html += `<h3 style="margin-bottom:10px;">Logs</h3><div class="logs" style="height:720px;">${data.logs.join('<br>')}</div>`;
+                infoDiv.innerHTML = html;
+
+                // Auto-scroll to the bottom of the logs
+                const logsDiv = infoDiv.querySelector('.logs');
+                if (logsDiv) {
+                    logsDiv.scrollTop = logsDiv.scrollHeight;
+                }
+
+                // Update the accounts list in the UI
+                updateAccountsList();
+            }
+
+
+            document.getElementById('addBtn').onclick = async () => {
+                const res = await fetch('/add', { method: 'POST' });
+                const data = await res.json();
+                if (data.success) {
+                    selectedClientId = data.clientId;
+                    updateAccountsList();
+                    updateAccountInfo();
+                }
+            };
+
+            setInterval(() => {
+                if (selectedClientId) {
+                    updateAccountInfo();
+                } else {
+                    updateAccountsList();
+                }
+            }, 500);
+
+            // Profile Dropdown Elements
+            const profileIcon = document.getElementById('profileIcon');
+            const dropdownContent = document.getElementById('dropdownContent');
+
+            // Modal Elements
+            const changePasswordModal = document.getElementById('changePasswordModal');
+            const closeChangePasswordModal = document.getElementById('closeChangePasswordModal');
+            const changePasswordBtn = document.getElementById('changePasswordBtn');
+            const changePasswordForm = document.getElementById('changePasswordForm');
+            const changePasswordError = document.getElementById('changePasswordError');
+            const changePasswordSuccess = document.getElementById('changePasswordSuccess');
+
+            const addAccountModal = document.getElementById('addAccountModal');
+            const closeAddAccountModal = document.getElementById('closeAddAccountModal');
+            const addAccountBtn = document.getElementById('addAccountBtn');
+            const addAccountForm = document.getElementById('addAccountForm');
+            const addAccountError = document.getElementById('addAccountError');
+            const addAccountSuccess = document.getElementById('addAccountSuccess');
+
+            // Toggle Dropdown Menu
+            profileIcon.addEventListener('click', () => {
+                dropdownContent.classList.toggle('show');
+            });
+
+            // Close dropdown if clicked outside
+            window.addEventListener('click', (e) => {
+                if (!e.target.matches('#profileIcon')) {
+                    if (dropdownContent.classList.contains('show')) {
+                        dropdownContent.classList.remove('show');
+                    }
+                }
+            });
+
+            // Open Change Password Modal
+            changePasswordBtn.addEventListener('click', () => {
+                changePasswordModal.style.display = 'block';
+                dropdownContent.classList.remove('show');
+            });
+
+            // Close Change Password Modal
+            closeChangePasswordModal.addEventListener('click', () => {
+                changePasswordModal.style.display = 'none';
+                // Clear messages and form
+                changePasswordError.textContent = '';
+                changePasswordSuccess.textContent = '';
+                changePasswordForm.reset();
+            });
+
+            // Handle Change Password Form Submission
+            changePasswordForm.addEventListener('submit', async (e) => {
+                e.preventDefault();
+
+                const currentPassword = document.getElementById('currentPassword').value.trim();
+                const newPassword = document.getElementById('newPassword').value.trim();
+                const confirmNewPassword = document.getElementById('confirmNewPassword').value.trim();
+
+                // Reset messages
+                changePasswordError.textContent = '';
+                changePasswordSuccess.textContent = '';
+
+                if (newPassword !== confirmNewPassword) {
+                    changePasswordError.textContent = 'Password baru dan konfirmasi tidak cocok.';
+                    return;
+                }
+
+                try {
+                    const res = await fetch('/change-password', { // sesuaikan endpoint dengan backend Anda
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ currentPassword, newPassword })
+                    });
+
+                    const data = await res.json();
+
+                    if (data.success) {
+                        changePasswordSuccess.textContent = 'Password berhasil diubah.';
+                        changePasswordForm.reset();
+                    } else {
+                        changePasswordError.textContent = 'Gagal mengubah password: ' + data.message;
+                    }
+                } catch (error) {
+                    console.error('Error during password change:', error);
+                    changePasswordError.textContent = 'Terjadi kesalahan. Silakan coba lagi.';
+                }
+            });
+
+            // Open Add Account Modal
+            addAccountBtn.addEventListener('click', () => {
+                addAccountModal.style.display = 'block';
+                dropdownContent.classList.remove('show');
+            });
+
+            // Close Add Account Modal
+            closeAddAccountModal.addEventListener('click', () => {
+                addAccountModal.style.display = 'none';
+                // Clear messages and form
+                addAccountError.textContent = '';
+                addAccountSuccess.textContent = '';
+                addAccountForm.reset();
+            });
+
+            // Handle Add Account Form Submission
+            addAccountForm.addEventListener('submit', async (e) => {
+                e.preventDefault();
+
+                const newUsername = document.getElementById('newUsername').value.trim();
+                const newPassword = document.getElementById('newPassword').value.trim();
+
+                // Reset messages
+                addAccountError.textContent = '';
+                addAccountSuccess.textContent = '';
+
+                try {
+                    const res = await fetch('/add-account', { // Sesuaikan endpoint dengan backend Anda
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ newUsername, newPassword })
+                    });
+
+                    const data = await res.json();
+
+                    if (data.success) {
+                        addAccountSuccess.textContent = 'Akun berhasil ditambahkan.';
+                        addAccountForm.reset();
+                        // Optionally, refresh accounts list
+                        updateAccountsList();
+                    } else {
+                        addAccountError.textContent = 'Gagal menambah akun: ' + data.message;
+                    }
+                } catch (error) {
+                    console.error('Error during adding account:', error);
+                    addAccountError.textContent = 'Terjadi kesalahan. Silakan coba lagi.';
+                }
+            });
+
+            // Handle Delete Session (Mengganti Fungsi Logout)
+            // Menghapus event listener untuk logout karena sekarang tombolnya adalah "Delete Session"
+            // Namun, jika ada tombol Logout di dropdown, tetap mempertahankan fungsinya
+            // Jika ingin mengganti fungsi Logout di dropdown juga, bisa disesuaikan
+
+            // Close modal when clicking outside of modal content
+            window.addEventListener('click', (event) => {
+                if (event.target === changePasswordModal) {
+                    changePasswordModal.style.display = 'none';
+                    changePasswordError.textContent = '';
+                    changePasswordSuccess.textContent = '';
+                    changePasswordForm.reset();
+                }
+
+                if (event.target === addAccountModal) {
+                    addAccountModal.style.display = 'none';
+                    addAccountError.textContent = '';
+                    addAccountSuccess.textContent = '';
+                    addAccountForm.reset();
+                }
+            });
+
+            // Initial load
+            updateAccountsList();
+        });
+    </script>
+    
+</body>
+</html>

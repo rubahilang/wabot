@@ -1,0 +1,192 @@
+<!-- public/login.html -->
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8"/>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+    <title>Login - WhatsApp Multiaccount Dashboard</title>
+    <style>
+        /* Root variables for dark theme */
+        :root {
+            --background-color: #1e1e2f;
+            --container-bg: #2c2c3e;
+            --primary-color: #4CAF50;
+            --input-bg: #3a3a4f;
+            --input-border: #555;
+            --text-color: #f0f0f0;
+            --error-color: #ff6b6b;
+            --button-hover: #45a049;
+            --font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            --logo-width: 100px; /* Ukuran lebar logo */
+        }
+
+        /* Global Styles */
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            background-color: var(--background-color);
+            color: var(--text-color);
+            font-family: var(--font-family);
+            height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .login-container {
+            background-color: var(--container-bg);
+            padding: 40px 30px;
+            border-radius: 8px;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.3);
+            width: 100%;
+            max-width: 400px;
+            text-align: center; /* Center align for logo and heading */
+        }
+
+        .login-container .logo {
+            width: var(--logo-width);
+            margin-bottom: 20px;
+        }
+
+        .login-container h2 {
+            text-align: center;
+            margin-bottom: 30px;
+            font-size: 2em;
+            color: var(--primary-color);
+        }
+
+        form {
+            display: flex;
+            flex-direction: column;
+            align-items: stretch; /* Ensure inputs take full width */
+        }
+
+        label {
+            margin-bottom: 8px;
+            font-size: 1rem;
+            text-align: left; /* Align labels to the left */
+        }
+
+        input[type="text"],
+        input[type="password"] {
+            padding: 12px 15px;
+            margin-bottom: 20px;
+            border: 1px solid var(--input-border);
+            border-radius: 4px;
+            background-color: var(--input-bg);
+            color: var(--text-color);
+            font-size: 1rem;
+            transition: border 0.3s;
+            width: 100%; /* Ensure inputs take full width */
+        }
+
+        input[type="text"]:focus,
+        input[type="password"]:focus {
+            border-color: var(--primary-color);
+            outline: none;
+        }
+
+        button {
+            padding: 12px 15px;
+            background-color: var(--primary-color);
+            color: #fff;
+            border: none;
+            border-radius: 4px;
+            font-size: 1rem;
+            cursor: pointer;
+            transition: background-color 0.3s;
+            width: 100%; /* Ensure button takes full width */
+        }
+
+        button:hover {
+            background-color: var(--button-hover);
+        }
+
+        .error-message {
+            margin-top: 15px;
+            color: var(--error-color);
+            text-align: center;
+            font-size: 0.9rem;
+        }
+
+        /* Responsive Design */
+        @media (max-width: 480px) {
+            .login-container {
+                padding: 30px 20px;
+            }
+
+            .login-container h2 {
+                font-size: 1.5em;
+                margin-bottom: 20px;
+            }
+
+            .login-container .logo {
+                width: 80px; /* Adjust logo size for smaller screens */
+                margin-bottom: 15px;
+            }
+
+            input[type="text"],
+            input[type="password"],
+            button {
+                font-size: 0.9rem;
+                padding: 10px 12px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="login-container">
+        <img src="https://foxyx.online/assets/images/foxy.png" alt="Logo" class="logo">
+        <h2>Login</h2>
+        <form id="loginForm" action="/login" method="POST">
+            <label for="username">Username:</label>
+            <input type="text" id="username" name="username" required maxlength="20">
+
+            <label for="password">Password:</label>
+            <input type="password" id="password" name="password" required maxlength="20">
+
+            <button type="submit">Login</button>
+        </form>
+        <p id="loginError" class="error-message"></p>
+    </div>
+
+    <script>
+        document.getElementById('loginForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+
+            const username = document.getElementById('username').value.trim();
+            const password = document.getElementById('password').value.trim();
+            const loginError = document.getElementById('loginError');
+
+            if (username === '' || password === '') {
+                loginError.textContent = 'Username dan password tidak boleh kosong.';
+                return;
+            }
+
+            try {
+                const res = await fetch('/login', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ username, password })
+                });
+
+                const data = await res.json();
+
+                if (data.success) {
+                    // Redirect ke dashboard jika login berhasil
+                    window.location.href = '/';
+                } else {
+                    loginError.textContent = 'Login gagal: ' + data.message;
+                }
+            } catch (error) {
+                console.error('Error during login:', error);
+                loginError.textContent = 'Terjadi kesalahan. Silakan coba lagi.';
+            }
+        });
+    </script>
+</body>
+</html>

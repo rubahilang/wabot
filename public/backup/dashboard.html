@@ -1,0 +1,223 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8"/>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+    <title>WhatsApp Multiaccount Dashboard</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <header>
+        <img src="https://foxyx.online/assets/images/foxy.png" alt="Logo" class="logo">
+        <h1>WhatsApp Bulk Multiaccount</h1>
+    </header>
+    <main>
+        <section class="controls">
+            <button id="addBtn">+ Add Account</button>
+            <div id="accounts"></div>
+        </section>
+        <section class="details">
+            <h2 id="accountTitle">Account Details</h2>
+            <div id="accountInfo">
+                <p>Select an account from the left panel</p>
+            </div>
+        </section>                 
+    </main>
+
+    <script>
+        let selectedClientId = null;
+
+        function updateAccountTitle(name) {
+            const accountTitle = document.getElementById('accountTitle');
+            accountTitle.textContent = `${name} Account`;
+        }
+
+
+        async function fetchClients() {
+            const res = await fetch('/list_clients');
+            return await res.json();
+        }
+
+        async function fetchAccountData(clientId) {
+            const res = await fetch('/account?clientId=' + clientId);
+            return await res.json();
+        }
+
+        async function logout(clientId) {
+            const res = await fetch('/logout', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ clientId })
+            });
+            const data = await res.json();
+            if (data.success) {
+                if (selectedClientId === clientId) {
+                    selectedClientId = null;
+                    document.getElementById('accountInfo').innerHTML = `<p>Select an account from the left panel</p>`;
+                }
+                updateAccountsList();
+            } else {
+                alert('Logout failed: ' + data.message);
+            }
+        }
+
+        async function rename(clientId) {
+            // Prompt the user to enter a new name with a clear instruction about the max length
+            const newName = prompt('Masukkan nama baru (maksimum 7 karakter):');
+
+            // Trim whitespace from the input
+            const trimmedName = newName ? newName.trim() : '';
+
+            // Check if the input is not empty
+            if (trimmedName !== '') {
+                // Validate the length of the new name
+                if (trimmedName.length > 7) {
+                    // Alert the user if the name exceeds 7 characters
+                    alert('Nama terlalu panjang. Maksimum 7 karakter.');
+                    return; // Exit the function early
+                }
+
+                try {
+                    // Send the rename request to the server
+                    const res = await fetch('/rename', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ clientId, newName: trimmedName })
+                    });
+
+                    // Parse the JSON response
+                    const data = await res.json();
+
+                    // Check if the rename was successful
+                    if (data.success) {
+                        // Update the accounts list in the UI
+                        updateAccountsList();
+
+                        // If the renamed client is currently selected, update its info
+                        if (selectedClientId === clientId) {
+                            updateAccountInfo();
+                        }
+
+                        // Optionally, notify the user of the successful rename
+                        alert('Nama berhasil diubah.');
+                    } else {
+                        // Alert the user if there was an error during renaming
+                        alert('Gagal mengubah nama: ' + data.message);
+                    }
+                } catch (error) {
+                    // Handle any network or unexpected errors
+                    console.error('Error during rename:', error);
+                    alert('Terjadi kesalahan saat mengubah nama. Silakan coba lagi.');
+                }
+            } else {
+                // Optionally, notify the user if no input was provided
+                alert('Nama baru tidak boleh kosong.');
+            }
+        }
+
+
+        async function updateAccountsList() {
+            const accounts = await fetchClients();
+            const accountsDiv = document.getElementById('accounts');
+            accountsDiv.innerHTML = '';
+            accounts.forEach(acc => {
+                const div = document.createElement('div');
+                div.classList.add('account-item');
+                if (acc.clientId === selectedClientId) {
+                    div.classList.add('active');
+                }
+                div.innerHTML = `
+                    <span class="acc-name">${acc.name} ${acc.ready ? '✅' : '❌'}</span>
+                    <button class="icon-btn rename-btn" data-id="${acc.clientId}" title="Rename">
+                        <img src="https://cdn-icons-png.flaticon.com/512/10977/10977199.png" alt="Rename" class="icon-img">
+                    </button>
+                    <button class="icon-btn logout-btn" data-id="${acc.clientId}" title="Delete">
+                        <img src="https://cdn-icons-png.flaticon.com/512/9790/9790368.png" alt="Delete" class="icon-img">
+                    </button>
+                `;
+                div.onclick = (e) => {
+                    if (e.target.closest('.logout-btn') || e.target.closest('.rename-btn')) return;
+                    selectedClientId = acc.clientId;
+                    updateAccountInfo();
+                    updateAccountTitle(acc.name); // Update the account title here
+                };
+                accountsDiv.appendChild(div);
+
+                const logoutBtn = div.querySelector('.logout-btn');
+                logoutBtn.onclick = async (e) => {
+                    e.stopPropagation();
+                    const cId = e.target.closest('button').getAttribute('data-id');
+                    await logout(cId);
+                };
+
+                const renameBtn = div.querySelector('.rename-btn');
+                renameBtn.onclick = async (e) => {
+                    e.stopPropagation();
+                    const cId = e.target.closest('button').getAttribute('data-id');
+                    await rename(cId);
+                };
+            });
+        }
+
+
+        async function updateAccountInfo() {
+            if (!selectedClientId) return;
+            
+            // Fetch account data from the server
+            const data = await fetchAccountData(selectedClientId);
+            const infoDiv = document.getElementById('accountInfo');
+            
+            // Handle error scenario
+            if (data.error) {
+                infoDiv.innerHTML = `<p>${data.error}</p>`;
+                return;
+            }
+
+            let html = '';
+            
+            // Display QR Code if available
+            if (data.qrData) {
+                html += `<h3>Scan this QR Code:</h3><img src="${data.qrData}" class="qr">`;
+            } else {
+                // Display connection status
+                html += `<p>Status: ${data.ready ? 'Connected ✅' : 'Not Connected ❌'}</p>`;
+            }
+
+            // Display Logs
+            html += `<h3>Logs</h3><div class="logs" style=height:580px;>${data.logs.join('<br>')}</div>`;
+            infoDiv.innerHTML = html;
+
+            // Auto-scroll to the bottom of the logs
+            const logsDiv = infoDiv.querySelector('.logs');
+            if (logsDiv) {
+                logsDiv.scrollTop = logsDiv.scrollHeight;
+            }
+
+            // Update the accounts list in the UI
+            updateAccountsList();
+        }
+
+
+        document.getElementById('addBtn').onclick = async () => {
+            const res = await fetch('/add', { method: 'POST' });
+            const data = await res.json();
+            if (data.success) {
+                selectedClientId = data.clientId;
+                updateAccountsList();
+                updateAccountInfo();
+            }
+        };
+
+        setInterval(() => {
+            if (selectedClientId) {
+                updateAccountInfo();
+            } else {
+                updateAccountsList();
+            }
+        }, 5000);
+
+        // Initial load
+        updateAccountsList();
+    </script>
+</body>
+</html>

@@ -1,0 +1,187 @@
+body {
+    margin: 0;
+    font-family: Arial, sans-serif;
+    background: #121212;
+    color: #e0e0e0;
+    height: 100vh;
+    display: flex;
+    flex-direction: column;
+}
+
+header {
+    display: flex; /* Menggunakan Flexbox */
+    align-items: center; /* Vertikal center */
+    justify-content: center; /* Horizontal center */
+    position: relative; /* Untuk positioning logo */
+    padding: 20px;
+    background-color: #1f1f1f;
+    border-bottom: 1px solid #2a2a2a;
+}
+
+.logo {
+    width: 50px; /* Atur ukuran logo sesuai kebutuhan */
+    height: auto;
+    position: relative; /* Menempatkan logo secara absolut */
+    top: 40%; /* Mengatur posisi vertikal */
+    transform: translateY(-50%); /* Memusatkan secara vertikal */
+}
+
+header h1 {
+    font-size: 24px;
+    color: #ffffff;
+    text-align: center;
+}
+
+main {
+    display: flex;
+    height: calc(100vh - 60px);
+    overflow: hidden;
+}
+
+.controls {
+    width: 250px;
+    background: #1f1f1f;
+    border-right: 1px solid #2a2a2a;
+    padding: 10px;
+    overflow-y: auto;
+    box-sizing: border-box;
+}
+
+.details {
+    flex: 1;
+    padding: 20px;
+    overflow-y: auto;
+    box-sizing: border-box;
+    background: #121212;
+}
+
+#addBtn {
+    background: #4caf50;
+    color: #ffffff;
+    border: none;
+    padding: 10px;
+    width: 100%;
+    cursor: pointer;
+    margin-bottom: 20px;
+    font-size: 16px;
+    border-radius: 4px;
+    transition: background 0.3s;
+}
+
+#addBtn:hover {
+    background: #43a047;
+}
+
+.account-item {
+    background: #1f1f1f;
+    padding: 10px;
+    margin-bottom: 5px;
+    cursor: pointer;
+    position: relative;
+    border: 1px solid #2a2a2a;
+    border-radius: 4px;
+    transition: background 0.3s;
+}
+
+.account-item:hover {
+    background: #2a2a2a;
+}
+
+.account-item.active {
+    background: #2a2a2a;
+}
+
+.acc-name {
+    margin-right: 10px;
+    font-weight: bold;
+    color: #e0e0e0;
+}
+
+/* Icon buttons */
+.icon-btn {
+    background: transparent;
+    border: none;
+    cursor: pointer;
+    margin-left: 8px;
+    padding: 5px;
+    border-radius: 4px;
+    transition: background 0.3s;
+    vertical-align: middle;
+}
+
+.icon-btn:hover {
+    background: #2a2a2a;
+}
+
+.icon-img {
+    width: 20px; /* Atur ukuran ikon */
+    height: 20px;
+    display: inline-block;
+    vertical-align: middle;
+}
+
+#accountInfo {
+    background: #1f1f1f;
+    padding: 20px;
+    border-radius: 4px;
+    border: 1px solid #2a2a2a;
+    flex: 1; /* Allows the div to grow and fill available space */
+    margin-bottom: 20px; /* Adds a 20px bottom margin */
+    overflow-y: auto; /* Makes the logs scrollable if they exceed the div's height */
+    color: #fff; /* Ensures text is visible on dark background */
+    white-space: pre-wrap; /* Preserves whitespace and line breaks */
+}
+
+.logs {
+    max-height: 100%; /* Ensures logs take up full height of #accountInfo */
+    overflow-y: auto; /* Enables scrolling within the logs */
+    background-color: #2a2a2a;
+    padding: 10px;
+    border-radius: 4px;
+    font-family: monospace; /* Enhances readability for logs */
+}
+
+#accountInfo h3 {
+    margin-top: 0;
+    color: #e0e0e0;
+}
+
+.qr {
+    max-width: 200px;
+    border: 1px solid #2a2a2a;
+    display: block;
+    margin-bottom: 20px;
+    border-radius: 4px;
+}
+
+.logs {
+    background: #121212;
+    white-space: pre-line;
+    border: 1px solid #2a2a2a;
+    padding: 10px;
+    overflow: auto;
+    border-radius: 4px;
+    color: #4caf50;
+    font-size: 14px;
+    line-height: 1.4;
+}
+
+.logs::-webkit-scrollbar {
+    width: 6px;
+    background: #1f1f1f;
+}
+
+.logs::-webkit-scrollbar-thumb {
+    background: #4caf50;
+    border-radius: 3px;
+}
+
+#accounts::-webkit-scrollbar {
+    width: 6px;
+    background: #1f1f1f;
+}
+
+#accounts::-webkit-scrollbar-thumb {
+    background: #4caf50;
+    border-radius: 3px;
+}
