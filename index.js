@@ -283,7 +283,7 @@ function saveClientsData() {
 function createClient(clientId) {
     const client = new Client({
         authStrategy: new LocalAuth({
-            clientId: "your-client-id",
+            clientId: clientId,
             dataPath: path.join(__dirname, 'sessions') // Menyesuaikan path sesi
         }),
         puppeteer: {
