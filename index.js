@@ -284,21 +284,22 @@ function createClient(clientId) {
     const client = new Client({
         authStrategy: new LocalAuth({
             clientId: clientId,
-            dataPath: path.join(__dirname, 'sessions') // Menyesuaikan path sesi
+            dataPath: SESSIONS_DIR
         }),
         puppeteer: {
             headless: true,
-            executablePath: '/usr/bin/chromium-browser', // Pastikan path ini benar
             args: [
                 '--no-sandbox',
                 '--disable-setuid-sandbox',
                 '--disable-dev-shm-usage',
                 '--disable-extensions',
                 '--disable-gpu',
-                '--window-size=1920,1080'
-            ]
+                '--window-size=1920x1080'
+            ],
+            executablePath: '/usr/bin/chromium-browser' // Pastikan path ini benar
         }
     });
+    
 
 
     // Initialize client data
