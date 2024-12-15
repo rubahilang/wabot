@@ -8,6 +8,7 @@ const session = require('express-session');
 const bodyParser = require('body-parser');
 const rateLimit = require('express-rate-limit');
 const { body, validationResult } = require('express-validator');
+const puppeteer = require('puppeteer');
 
 const app = express();
 app.use(express.static(path.join(__dirname, 'public')));
@@ -302,6 +303,7 @@ function createClient(clientId) {
             dataPath: SESSIONS_DIR
         }),
         puppeteer: {
+            executablePath: puppeteer.executablePath(),
             headless: true,
             args: [
                 '--no-sandbox',
@@ -310,11 +312,10 @@ function createClient(clientId) {
                 '--disable-extensions',
                 '--disable-gpu',
                 '--window-size=1920x1080'
-            ],
-            executablePath: '/usr/bin/chromium-browser' // Pastikan path ini benar
+            ]
         }
     });
-    
+        
 
 
     // Initialize client data
