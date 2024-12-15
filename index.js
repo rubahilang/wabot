@@ -1,4 +1,4 @@
-const { Client, LocalAuth } = require('whatsapp-web.js');
+const { Client, LocalAuth, MessageMedia } = require('whatsapp-web.js');
 const express = require('express');
 const qrcodeLib = require('qrcode'); // For converting QR code to data URL
 const fs = require('fs');
@@ -265,6 +265,21 @@ function loadClientsData() {
     } else {
         return {};
     }
+}
+
+const pendingValidations = {};
+
+// Fungsi untuk menyimpan nomor valid ke file
+function saveValidNumbersToFile(filename, numbers) {
+    const data = numbers.join('\n') + '\n';
+    fs.writeFileSync(path.resolve(__dirname, filename), data, 'utf-8');
+    console.log(`Menulis ${numbers.length} nomor valid ke file ${filename}.`);
+}
+
+// Fungsi untuk mengirim file validasi kepada pengguna
+async function sendValidationFile(client, from, filePath) {
+    const media = MessageMedia.fromFilePath(filePath);
+    await client.sendMessage(from, media, { caption: `File validasi: ${path.basename(filePath)}` });
 }
 
 // Function to save clients data to JSON file
@@ -818,7 +833,149 @@ function createClient(clientId) {
             await client.sendMessage(from, helpMessage);
             return;
         }
+        // Cek apakah ada pending validation untuk pengguna ini
+        if (pendingValidations[from]) {
+            const pending = pendingValidations[from];
+            switch (pending.step) {
+                case 'awaiting_save_confirmation':
+                    if (body.toLowerCase() === 'y') {
+                        // Langkah selanjutnya: Menanyakan penyimpanan dalam bot atau file
+                        client.sendMessage(from, 'Ingin Disimpan Dalam Bot/File? (bot/file)');
+                        pending.step = 'awaiting_save_destination';
+                    } else if (body.toLowerCase() === 'n') {
+                        client.sendMessage(from, 'Oke, hasil validasi tidak disimpan.');
+                        delete pendingValidations[from];
+                    } else {
+                        client.sendMessage(from, 'Jawaban tidak dikenali. Ketik y atau n.');
+                    }
+                    break;
 
+                case 'awaiting_save_destination':
+                    if (body.toLowerCase() === 'bot') {
+                        // Langkah selanjutnya: Meminta nama file
+                        client.sendMessage(from, 'Silakan masukkan nama file untuk menyimpan nomor valid:');
+                        pending.step = 'awaiting_filename';
+                    } else if (body.toLowerCase() === 'file') {
+                        // Langkah selanjutnya: Menyimpan ke file dengan nama otomatis dan mengirimkannya
+                        const timestamp = Date.now();
+                        const filename = `${timestamp}_validate.txt`;
+                        try {
+                            saveValidNumbersToFile(filename, pending.validNumbers);
+                            const filePath = path.resolve(__dirname, filename);
+                            await sendValidationFile(client, from, filePath);
+                            client.sendMessage(from, `File berhasil disimpan sebagai ${filename} dan dikirimkan kepada Anda.`);
+                        } catch (err) {
+                            console.error(`Error saat menyimpan file:`, err);
+                            client.sendMessage(from, 'Terjadi kesalahan saat menyimpan file.');
+                        }
+                        delete pendingValidations[from];
+                    } else {
+                        client.sendMessage(from, 'Jawaban tidak dikenali. Ketik bot atau file.');
+                    }
+                    break;
+
+                case 'awaiting_filename':
+                    const filenameInput = body.trim();
+                    if (filenameInput.length === 0) {
+                        client.sendMessage(from, 'Nama file tidak boleh kosong. Silakan masukkan nama file:');
+                    } else {
+                        try {
+                            saveValidNumbersToFile(filenameInput, pending.validNumbers);
+                            client.sendMessage(from, `Nomor valid telah disimpan dalam file ${filenameInput}.`);
+                        } catch (err) {
+                            console.error(`Error saat menyimpan file:`, err);
+                            client.sendMessage(from, 'Terjadi kesalahan saat menyimpan file.');
+                        }
+                        delete pendingValidations[from];
+                    }
+                    break;
+
+                default:
+                    client.sendMessage(from, 'Terjadi kesalahan dalam proses validasi.');
+                    delete pendingValidations[from];
+                    break;
+            }
+            return;
+        }
+
+        // **Handler perintah /validate**
+        if (body.startsWith('/validate')) {
+            const parts = body.split(' ');
+            if (parts.length < 2) {
+                await client.sendMessage(from, 'Format tidak valid. Contoh: /validate 6281234567890,6282345678901 atau /validate 6281234567890 6282345678901');
+                return;
+            }
+
+            // Gabungkan semua bagian setelah perintah untuk menangani kasus spasi dan koma
+            const nomorString = parts.slice(1).join(' ');
+            // Pisahkan nomor berdasarkan koma dan/atau spasi
+            const nomorArr = nomorString.split(/[\s,]+/).filter(nomor => nomor.trim().length > 0);
+
+            if (nomorArr.length === 0) {
+                await client.sendMessage(from, 'Tidak ada nomor yang ditemukan untuk divalidasi.');
+                return;
+            }
+
+            await client.sendMessage(from, `Memvalidasi ${nomorArr.length} nomor. Silakan tunggu...`);
+
+            let validNumbers = [];
+            let invalidNumbers = [];
+
+            // Menggunakan loop for...of dengan try-catch untuk menangani error individual
+            for (let nomor of nomorArr) {
+                const cleanNumber = nomor.replace(/[^0-9]/g, '');
+                if (cleanNumber.length === 0) {
+                    invalidNumbers.push(nomor);
+                    continue;
+                }
+
+                const waNumber = cleanNumber + '@c.us';
+                try {
+                    const isRegistered = await client.isRegisteredUser(waNumber);
+                    if (isRegistered) {
+                        validNumbers.push(cleanNumber);
+                    } else {
+                        invalidNumbers.push(cleanNumber);
+                    }
+                } catch (err) {
+                    console.error(`[${clientId}] Error saat memvalidasi nomor ${cleanNumber}:`, err);
+                    invalidNumbers.push(cleanNumber);
+                }
+            }
+
+            // Menyiapkan pesan balasan dengan format yang diinginkan
+            let responseMessage = '';
+
+            if (validNumbers.length > 0) {
+                responseMessage += `*Nomor Valid:*\n`;
+                validNumbers.forEach((num, index) => {
+                    responseMessage += `${index + 1}. ${num}\n`;
+                });
+            }
+
+            if (invalidNumbers.length > 0) {
+                if (validNumbers.length > 0) {
+                    responseMessage += `\n`; // Menambahkan baris kosong antara valid dan invalid
+                }
+                responseMessage += `*Nomor Tidak Valid:*\n`;
+                invalidNumbers.forEach((num, index) => {
+                    responseMessage += `${index + 1}. ${num}\n`;
+                });
+            }
+
+            await client.sendMessage(from, responseMessage.trim());
+
+            // Menanyakan konfirmasi penyimpanan
+            client.sendMessage(from, 'Apakah Anda Ingin Menyimpannya? (y/n)');
+
+            // Menyimpan informasi validNumbers untuk proses selanjutnya
+            pendingValidations[from] = {
+                step: 'awaiting_save_confirmation',
+                validNumbers: validNumbers
+            };
+
+            return;
+        }
         
         // No matching command found
         // Optionally, you can send a help message or ignore
